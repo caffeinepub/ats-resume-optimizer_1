@@ -1,0 +1,102 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Navy/Emerald professional palette */
+    --background: 0.98 0.004 220;
+    --foreground: 0.15 0.02 240;
+    --card: 1 0 0;
+    --card-foreground: 0.15 0.02 240;
+    --popover: 1 0 0;
+    --popover-foreground: 0.15 0.02 240;
+    --primary: 0.52 0.17 162;
+    --primary-foreground: 1 0 0;
+    --secondary: 0.95 0.008 220;
+    --secondary-foreground: 0.2 0.02 240;
+    --muted: 0.95 0.006 220;
+    --muted-foreground: 0.5 0.015 240;
+    --accent: 0.52 0.17 162;
+    --accent-foreground: 1 0 0;
+    --destructive: 0.55 0.22 25;
+    --destructive-foreground: 1 0 0;
+    --success: 0.55 0.17 145;
+    --success-foreground: 1 0 0;
+    --warning: 0.72 0.16 68;
+    --warning-foreground: 0.15 0.02 240;
+    --border: 0.88 0.012 220;
+    --input: 0.88 0.012 220;
+    --ring: 0.52 0.17 162;
+    --radius: 0.5rem;
+    --sidebar-bg: 0.14 0.025 250;
+    --sidebar-text: 0.75 0.015 240;
+    --sidebar-text-active: 0.97 0.01 240;
+    --sidebar-accent: 0.52 0.17 162;
+    --sidebar-border: 0.2 0.025 250;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Bricolage Grotesque", sans-serif;
+  }
+  code,
+  pre,
+  .mono {
+    font-family: "JetBrains Mono", monospace;
+  }
+}
+
+@layer components {
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer;
+    color: oklch(var(--sidebar-text));
+  }
+  .sidebar-nav-item:hover {
+    background: oklch(var(--sidebar-bg) / 0.6);
+    color: oklch(var(--sidebar-text-active));
+  }
+  .sidebar-nav-item.active {
+    background: oklch(var(--sidebar-accent) / 0.15);
+    color: oklch(var(--sidebar-text-active));
+    border-left: 2px solid oklch(var(--sidebar-accent));
+  }
+  .score-ring {
+    transform-origin: center;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease-in-out;
+  }
+  .tag-chip {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    body {
+      background: white !important;
+    }
+    .print-area {
+      width: 100% !important;
+      max-width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+  }
+}
