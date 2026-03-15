@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 export interface GitHubRepo {
   name: string;
@@ -16,6 +16,7 @@ export interface Profile {
   location: string;
   linkedinUrl: string;
   githubUsername: string;
+  portfolioUrl: string;
   summary: string;
   importedResumeText: string;
   githubRepos: GitHubRepo[];
@@ -87,6 +88,7 @@ const defaultProfile: Profile = {
   location: "",
   linkedinUrl: "",
   githubUsername: "",
+  portfolioUrl: "",
   summary: "",
   importedResumeText: "",
   githubRepos: [],
@@ -124,7 +126,9 @@ const defaultScore: ScoreData = {
 function load<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as T;
+    return { ...fallback, ...(parsed as object) } as T;
   } catch {
     return fallback;
   }

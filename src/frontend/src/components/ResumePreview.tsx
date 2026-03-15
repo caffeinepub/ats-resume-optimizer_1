@@ -9,13 +9,7 @@ interface Props {
   scale?: number;
 }
 
-function SectionHeader({
-  title,
-  color,
-}: {
-  title: string;
-  color?: string;
-}) {
+function SectionHeader({ title, color }: { title: string; color?: string }) {
   return (
     <div
       style={{
@@ -75,6 +69,8 @@ export default function ResumePreview({
       : {}),
   };
 
+  const strip = (url: string) => url.replace(/^https?:\/\//i, "");
+
   return (
     <div style={containerStyle}>
       <div
@@ -98,17 +94,26 @@ export default function ResumePreview({
         <div
           style={{
             display: "flex",
-            gap: 16,
+            gap: 12,
             marginTop: 6,
             flexWrap: "wrap",
             fontSize: 10,
             color: "#555",
           }}
         >
-          {profile.email && <span>📧 {profile.email}</span>}
-          {profile.phone && <span>📞 {profile.phone}</span>}
-          {profile.location && <span>📍 {profile.location}</span>}
-          {profile.linkedinUrl && <span>🔗 {profile.linkedinUrl}</span>}
+          {profile.email && <span>✉ {profile.email}</span>}
+          {profile.phone && <span>☏ {profile.phone}</span>}
+          {profile.location && <span>⌖ {profile.location}</span>}
+          {profile.linkedinUrl && (
+            <span style={{ color: "#0077b5" }}>
+              in/
+              {strip(profile.linkedinUrl).replace(/.*linkedin\.com\/in\//i, "")}
+            </span>
+          )}
+          {profile.githubUsername && (
+            <span>⌥ github.com/{profile.githubUsername}</span>
+          )}
+          {profile.portfolioUrl && <span>⊕ {strip(profile.portfolioUrl)}</span>}
         </div>
       </div>
 

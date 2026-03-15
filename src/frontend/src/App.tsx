@@ -27,7 +27,13 @@ export default function App() {
   const renderPage = () => {
     switch (activePage) {
       case "profile":
-        return <ProfileImport profile={profile} setProfile={setProfile} />;
+        return (
+          <ProfileImport
+            profile={profile}
+            setProfile={setProfile}
+            setResume={setResume}
+          />
+        );
       case "job":
         return <JobDescription job={job} setJob={setJob} />;
       case "editor":
