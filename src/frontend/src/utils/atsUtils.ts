@@ -219,24 +219,147 @@ const STOP_WORDS = new Set([
   "qualifications",
 ]);
 
+// Unused but kept for potential external use
+export { STOP_WORDS };
+
 export function extractKeywords(text: string): string[] {
   const lower = text.toLowerCase();
   const matched = TECH_KEYWORDS.filter((kw) =>
     lower.includes(kw.toLowerCase()),
   );
+  return [...new Set(matched)].slice(0, 40);
+}
 
-  // Also extract capitalized non-stop words
-  const words = text.split(/[\s,;.!?]+/);
-  const extraKeywords = words.filter((w) => {
-    if (w.length < 2) return false;
-    if (STOP_WORDS.has(w.toLowerCase())) return false;
-    if (/^[A-Z]/.test(w) && w.length > 2) return true;
-    if (w.includes("+") || w.includes("#")) return true;
-    return false;
-  });
+export function extractTechnicalSkills(text: string): string[] {
+  const lower = text.toLowerCase();
+  return TECH_KEYWORDS.filter((kw) => lower.includes(kw.toLowerCase())).slice(
+    0,
+    30,
+  );
+}
 
-  const combined = [...new Set([...matched, ...extraKeywords])];
-  return combined.slice(0, 40);
+export function extractExperienceRequirements(text: string): string[] {
+  const results: string[] = [];
+  const lower = text.toLowerCase();
+
+  const yearPatterns: [RegExp, string][] = [
+    [/\b0[\s-]*1\s*years?/i, "0-1 year experience"],
+    [/\b1[\s-]*2\s*years?/i, "1-2 years of experience"],
+    [/\b2[\s-]*3\s*years?/i, "2-3 years of experience"],
+    [/\b3[\s-]*5\s*years?/i, "3-5 years of experience"],
+    [/\b5[\s-]*7\s*years?/i, "5-7 years of experience"],
+    [/\b7\+\s*years?/i, "7+ years of experience required"],
+    [/\b5\+\s*years?/i, "5+ years of experience required"],
+    [/\b3\+\s*years?/i, "3+ years of experience required"],
+    [/\b2\+\s*years?/i, "2+ years of experience required"],
+    [/\b1\+\s*years?/i, "1+ year of experience required"],
+    [/\b(\d+)\+\s*years?/i, "Multiple years of experience required"],
+  ];
+
+  for (const [pattern, label] of yearPatterns) {
+    if (pattern.test(text) && !results.includes(label)) {
+      results.push(label);
+      break;
+    }
+  }
+
+  if (lower.includes("senior") || lower.includes("sr.")) {
+    results.push("Senior level position");
+  }
+  if (lower.includes("junior") || lower.includes("jr.")) {
+    results.push("Junior level position");
+  }
+  if (lower.includes("mid-level") || lower.includes("mid level")) {
+    results.push("Mid-level position");
+  }
+  if (lower.includes("entry level") || lower.includes("entry-level")) {
+    results.push("Entry level position");
+  }
+  if (
+    lower.includes("internship") ||
+    lower.includes("intern") ||
+    lower.includes("co-op")
+  ) {
+    results.push("Internship experience preferred");
+  }
+  if (
+    lower.includes("fresher") ||
+    lower.includes("new graduate") ||
+    lower.includes("fresh graduate") ||
+    lower.includes("recent graduate")
+  ) {
+    results.push("Open to fresh graduates / new graduates");
+  }
+  if (lower.includes("lead") || lower.includes("tech lead")) {
+    results.push("Leadership / tech lead experience expected");
+  }
+  if (lower.includes("team player") || lower.includes("cross-functional")) {
+    results.push("Team collaboration experience required");
+  }
+
+  return [...new Set(results)];
+}
+
+export function extractProjectRequirements(text: string): string[] {
+  const DOMAIN_KEYWORDS = [
+    "web application",
+    "mobile app",
+    "API",
+    "microservices",
+    "data pipeline",
+    "machine learning model",
+    "e-commerce",
+    "SaaS",
+    "cloud infrastructure",
+    "dashboard",
+    "real-time",
+    "distributed system",
+    "open source",
+    "full stack",
+    "backend service",
+    "frontend application",
+    "data warehouse",
+    "CI/CD pipeline",
+    "REST API",
+    "GraphQL API",
+    "authentication system",
+    "payment integration",
+    "recommendation system",
+    "search engine",
+    "content management",
+    "analytics platform",
+  ];
+
+  const lower = text.toLowerCase();
+  const results: string[] = [];
+
+  for (const kw of DOMAIN_KEYWORDS) {
+    if (lower.includes(kw.toLowerCase())) {
+      results.push(kw.charAt(0).toUpperCase() + kw.slice(1));
+    }
+  }
+
+  // Also capture phrases after trigger words
+  const triggerPhrases = [
+    /experience with ([A-Za-z][A-Za-z0-9\s-]{3,30}?)(?=[,.]|\band\b|\bor\b|$)/gi,
+    /knowledge of ([A-Za-z][A-Za-z0-9\s-]{3,30}?)(?=[,.]|\band\b|\bor\b|$)/gi,
+    /familiarity with ([A-Za-z][A-Za-z0-9\s-]{3,30}?)(?=[,.]|\band\b|\bor\b|$)/gi,
+    /background in ([A-Za-z][A-Za-z0-9\s-]{3,30}?)(?=[,.]|\band\b|\bor\b|$)/gi,
+    /projects? in ([A-Za-z][A-Za-z0-9\s-]{3,30}?)(?=[,.]|\band\b|\bor\b|$)/gi,
+  ];
+
+  for (const pattern of triggerPhrases) {
+    let match = pattern.exec(text);
+    while (match !== null) {
+      const captured = match[1].trim();
+      if (captured.length > 3 && !results.includes(captured)) {
+        results.push(captured);
+      }
+      match = pattern.exec(text);
+    }
+  }
+
+  return [...new Set(results)].slice(0, 10);
 }
 
 export function detectJobTitle(text: string): string {
@@ -305,6 +428,57 @@ export function extractRequiredSkills(text: string): string[] {
   return TECH_KEYWORDS.filter((kw) =>
     text.toLowerCase().includes(kw.toLowerCase()),
   ).slice(0, 20);
+}
+
+export function optimizeResumeForJob(
+  resume: ResumeData,
+  _profile: Profile,
+  job: JobData,
+): ResumeData {
+  // Merge missing required skills
+  const existingSkillsLower = resume.skills.map((s) => s.toLowerCase());
+  const newSkills = job.technicalSkills.filter(
+    (s) => !existingSkillsLower.includes(s.toLowerCase()),
+  );
+  const mergedSkills = [...resume.skills, ...newSkills];
+
+  // Enhance summary
+  const topSkills = job.technicalSkills.slice(0, 3).join(", ");
+  const tailoredIntro = job.jobTitle
+    ? `Results-driven ${job.jobTitle} with expertise in ${topSkills || "modern technologies"}. `
+    : "";
+  const updatedSummary = resume.summary
+    ? `${tailoredIntro}${resume.summary}`
+    : tailoredIntro ||
+      `Experienced professional skilled in ${
+        job.requiredSkills.slice(0, 4).join(", ") ||
+        "modern software development"
+      }. Passionate about delivering high-quality solutions aligned with business goals.`;
+
+  // Enhance experience bullets with missing keywords
+  const relevantKeywords = [
+    ...job.requiredSkills,
+    ...job.technicalSkills,
+  ].filter(Boolean);
+
+  const updatedExperience = resume.experience.map((exp) => {
+    const expText = [...exp.bullets, exp.jobTitle].join(" ").toLowerCase();
+    // Find a keyword not already in this experience
+    const missingKw = relevantKeywords.find(
+      (kw) => !expText.includes(kw.toLowerCase()),
+    );
+    if (!missingKw) return exp;
+
+    const extraBullet = `Leveraged ${missingKw} to improve system performance and delivery quality`;
+    return { ...exp, bullets: [...exp.bullets, extraBullet] };
+  });
+
+  return {
+    ...resume,
+    skills: mergedSkills,
+    summary: updatedSummary,
+    experience: updatedExperience,
+  };
 }
 
 export function computeAtsScore(
@@ -424,7 +598,6 @@ const ACTION_VERBS = [
 
 export function improveBullet(bullet: string): string {
   const lower = bullet.toLowerCase().trim();
-  // Remove weak starts
   const weakStarts = [
     "worked on",
     "helped with",
@@ -441,7 +614,6 @@ export function improveBullet(bullet: string): string {
       break;
     }
   }
-  // Add action verb if not starting with one
   const startsWithVerb = ACTION_VERBS.some((v) =>
     cleaned.toLowerCase().startsWith(v.toLowerCase()),
   );
@@ -449,7 +621,6 @@ export function improveBullet(bullet: string): string {
     const verb = ACTION_VERBS[Math.floor(Math.random() * ACTION_VERBS.length)];
     cleaned = `${verb} ${cleaned.charAt(0).toLowerCase()}${cleaned.slice(1)}`;
   }
-  // Add metric hint if no numbers
   if (!/\d/.test(cleaned)) {
     const metrics = [
       ", improving performance by 30%",

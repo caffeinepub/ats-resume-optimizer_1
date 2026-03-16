@@ -65,6 +65,9 @@ export interface JobData {
   description: string;
   keywords: string[];
   requiredSkills: string[];
+  technicalSkills: string[];
+  experienceRequirements: string[];
+  projectRequirements: string[];
   experienceLevel: string;
   jobTitle: string;
   analyzed: boolean;
@@ -107,6 +110,9 @@ const defaultJob: JobData = {
   description: "",
   keywords: [],
   requiredSkills: [],
+  technicalSkills: [],
+  experienceRequirements: [],
+  projectRequirements: [],
   experienceLevel: "",
   jobTitle: "",
   analyzed: false,

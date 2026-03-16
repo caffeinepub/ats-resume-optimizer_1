@@ -6,7 +6,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Lightbulb,
+  Loader2,
   RefreshCw,
+  Sparkles,
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -17,7 +19,7 @@ import type {
   ResumeData,
   ScoreData,
 } from "../hooks/useResumeData";
-import { computeAtsScore } from "../utils/atsUtils";
+import { computeAtsScore, optimizeResumeForJob } from "../utils/atsUtils";
 
 interface Props {
   resume: ResumeData;
@@ -25,6 +27,7 @@ interface Props {
   job: JobData;
   score: ScoreData;
   setScore: (s: ScoreData | ((prev: ScoreData) => ScoreData)) => void;
+  setResume: (r: ResumeData | ((prev: ResumeData) => ResumeData)) => void;
 }
 
 function ScoreRing({ score, size = 160 }: { score: number; size?: number }) {
@@ -84,8 +87,12 @@ export default function ATSScore({
   job,
   score,
   setScore,
+  setResume,
 }: Props) {
   const [animated, setAnimated] = useState(false);
+  const [customizing, setCustomizing] = useState(false);
+  const [customized, setCustomized] = useState(false);
+  const [customizedScore, setCustomizedScore] = useState(0);
 
   const refreshScore = () => {
     if (!job.analyzed) {
@@ -97,6 +104,20 @@ export default function ATSScore({
     setAnimated(false);
     setTimeout(() => setAnimated(true), 50);
     toast.success("ATS score refreshed!");
+  };
+
+  const handleAutoCustomize = () => {
+    setCustomizing(true);
+    setTimeout(() => {
+      const optimized = optimizeResumeForJob(resume, profile, job);
+      setResume(optimized);
+      const newScore = computeAtsScore(optimized, profile, job);
+      setScore(newScore);
+      setCustomizedScore(newScore.overall);
+      setCustomized(true);
+      setCustomizing(false);
+      toast.success("Resume customized! Your score has been updated.");
+    }, 800);
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
@@ -122,6 +143,9 @@ export default function ATSScore({
       icon: TrendingUp,
     },
   ];
+
+  const showCustomizePrompt =
+    job.analyzed && score.overall > 0 && score.overall < 90 && !customized;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -156,152 +180,223 @@ export default function ATSScore({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="text-base font-display text-center">
-                Overall ATS Score
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center space-y-4">
-              <div data-ocid="score.panel">
-                <ScoreRing score={animated ? score.overall : 0} size={180} />
-              </div>
-              <div className="w-full space-y-2">
-                {breakdown.map((b) => (
-                  <div key={b.label} className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">{b.label}</span>
-                      <span className="font-medium">{b.value}%</span>
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="text-base font-display text-center">
+                  Overall ATS Score
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center space-y-4">
+                <div data-ocid="score.panel">
+                  <ScoreRing score={animated ? score.overall : 0} size={180} />
+                </div>
+                <div className="w-full space-y-2">
+                  {breakdown.map((b) => (
+                    <div key={b.label} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">{b.label}</span>
+                        <span className="font-medium">{b.value}%</span>
+                      </div>
+                      <Progress
+                        value={animated ? b.value : 0}
+                        className="h-1.5"
+                      />
                     </div>
-                    <Progress
-                      value={animated ? b.value : 0}
-                      className="h-1.5"
-                    />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="lg:col-span-2 space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-display flex items-center gap-2">
-                  <CheckCircle2 size={14} className="text-success" />
-                  Matched Keywords
-                  <Badge variant="secondary" className="ml-auto">
-                    {score.matchedKeywords.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {score.matchedKeywords.length === 0 ? (
-                  <p
-                    className="text-sm text-muted-foreground"
-                    data-ocid="score.matched.empty_state"
-                  >
-                    No keywords matched yet.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {score.matchedKeywords.map((kw) => (
-                      <span
-                        key={kw}
-                        className="tag-chip"
-                        style={{
-                          background: "oklch(0.55 0.17 145 / 0.1)",
-                          color: "oklch(0.4 0.15 145)",
-                          border: "1px solid oklch(0.55 0.17 145 / 0.3)",
-                        }}
-                      >
-                        <CheckCircle2 size={10} />
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-display flex items-center gap-2">
-                  <AlertCircle size={14} className="text-destructive" />
-                  Missing Keywords
-                  <Badge variant="secondary" className="ml-auto">
-                    {score.missingKeywords.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {score.missingKeywords.length === 0 ? (
-                  <p
-                    className="text-sm text-muted-foreground"
-                    data-ocid="score.missing.empty_state"
-                  >
-                    All keywords matched! 🎉
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {score.missingKeywords.map((kw) => (
-                      <span
-                        key={kw}
-                        className="tag-chip"
-                        style={{
-                          background: "oklch(0.55 0.22 25 / 0.08)",
-                          color: "oklch(0.45 0.2 25)",
-                          border: "1px solid oklch(0.55 0.22 25 / 0.25)",
-                        }}
-                      >
-                        <AlertCircle size={10} />
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-display flex items-center gap-2">
-                  <Lightbulb size={14} className="text-warning" />
-                  Improvement Suggestions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {score.suggestions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Your resume looks great!
-                  </p>
-                ) : (
-                  <ol className="space-y-2">
-                    {score.suggestions.map((s, i) => (
-                      <li
-                        // biome-ignore lint/suspicious/noArrayIndexKey: suggestions are ordered
-                        key={i}
-                        data-ocid={`score.suggestions.item.${i + 1}`}
-                        className="flex gap-3 text-sm"
-                      >
+            <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-display flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-success" />
+                    Matched Keywords
+                    <Badge variant="secondary" className="ml-auto">
+                      {score.matchedKeywords.length}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {score.matchedKeywords.length === 0 ? (
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-ocid="score.matched.empty_state"
+                    >
+                      No keywords matched yet.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {score.matchedKeywords.map((kw) => (
                         <span
-                          className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold"
+                          key={kw}
+                          className="tag-chip"
                           style={{
-                            background: "oklch(0.72 0.16 68 / 0.15)",
-                            color: "oklch(0.55 0.16 68)",
+                            background: "oklch(0.55 0.17 145 / 0.1)",
+                            color: "oklch(0.4 0.15 145)",
+                            border: "1px solid oklch(0.55 0.17 145 / 0.3)",
                           }}
                         >
-                          {i + 1}
+                          <CheckCircle2 size={10} />
+                          {kw}
                         </span>
-                        <span className="text-foreground">{s}</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-display flex items-center gap-2">
+                    <AlertCircle size={14} className="text-destructive" />
+                    Missing Keywords
+                    <Badge variant="secondary" className="ml-auto">
+                      {score.missingKeywords.length}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {score.missingKeywords.length === 0 ? (
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-ocid="score.missing.empty_state"
+                    >
+                      All keywords matched! 🎉
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {score.missingKeywords.map((kw) => (
+                        <span
+                          key={kw}
+                          className="tag-chip"
+                          style={{
+                            background: "oklch(0.55 0.22 25 / 0.08)",
+                            color: "oklch(0.45 0.2 25)",
+                            border: "1px solid oklch(0.55 0.22 25 / 0.25)",
+                          }}
+                        >
+                          <AlertCircle size={10} />
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-display flex items-center gap-2">
+                    <Lightbulb size={14} className="text-warning" />
+                    Improvement Suggestions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {score.suggestions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Your resume looks great!
+                    </p>
+                  ) : (
+                    <ol className="space-y-2">
+                      {score.suggestions.map((s, i) => (
+                        <li
+                          // biome-ignore lint/suspicious/noArrayIndexKey: suggestions are ordered
+                          key={i}
+                          data-ocid={`score.suggestions.item.${i + 1}`}
+                          className="flex gap-3 text-sm"
+                        >
+                          <span
+                            className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold"
+                            style={{
+                              background: "oklch(0.72 0.16 68 / 0.15)",
+                              color: "oklch(0.55 0.16 68)",
+                            }}
+                          >
+                            {i + 1}
+                          </span>
+                          <span className="text-foreground">{s}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Auto-customize prompt when score < 90 */}
+          {showCustomizePrompt && (
+            <Card
+              data-ocid="score.auto_customize.card"
+              className="border-warning/30"
+              style={{ background: "oklch(0.72 0.16 68 / 0.05)" }}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-display flex items-center gap-2">
+                  <Sparkles size={16} className="text-warning" />
+                  Resume Score Below 90% — Auto-Customize Available
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Your resume matches{" "}
+                  <span className="font-semibold text-foreground">
+                    {score.overall}%
+                  </span>{" "}
+                  of this job&apos;s requirements. Clicking below will
+                  automatically add missing technical skills, enhance your
+                  summary to target this role, and insert relevant keywords into
+                  your experience bullets.
+                </p>
+                <Button
+                  type="button"
+                  data-ocid="score.auto_customize.primary_button"
+                  onClick={handleAutoCustomize}
+                  disabled={customizing}
+                  className="gap-2"
+                >
+                  {customizing ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Customizing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      Auto-Customize Resume for This Job
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
-          </div>
-        </div>
+          )}
+
+          {/* Success card after customization */}
+          {customized && (
+            <Card
+              data-ocid="score.auto_customize.success_state"
+              className="border-success/30"
+              style={{ background: "oklch(0.55 0.17 145 / 0.05)" }}
+            >
+              <CardContent className="py-6 flex items-center gap-4">
+                <CheckCircle2 size={32} className="text-success shrink-0" />
+                <div>
+                  <p className="font-semibold text-foreground">
+                    Resume optimized to {customizedScore}% match!
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Your resume has been updated. Go to Resume Editor to review
+                    and fine-tune the changes.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );

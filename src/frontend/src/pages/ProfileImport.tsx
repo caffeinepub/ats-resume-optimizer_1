@@ -7,24 +7,34 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Briefcase,
   Code2,
+  Download,
   ExternalLink,
+  FileText,
   Github,
   Globe,
+  Info,
   Linkedin,
   Loader2,
   RefreshCw,
   Save,
   Sparkles,
   Star,
+  Upload,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
-import type { GitHubRepo, Profile, ResumeData } from "../hooks/useResumeData";
+import type {
+  GitHubRepo,
+  JobData,
+  Profile,
+  ResumeData,
+} from "../hooks/useResumeData";
 
 interface Props {
   profile: Profile;
   setProfile: (p: Profile | ((prev: Profile) => Profile)) => void;
   setResume?: (r: ResumeData | ((prev: ResumeData) => ResumeData)) => void;
+  job?: JobData;
 }
 
 function extractGithubUsername(input: string): string {
@@ -55,13 +65,69 @@ function extractLinkedInHandle(input: string): string {
   return trimmed;
 }
 
+function scoreRepoRelevance(repo: GitHubRepo, job?: JobData): number {
+  if (
+    !job ||
+    (!job.description &&
+      job.keywords.length === 0 &&
+      job.requiredSkills.length === 0)
+  ) {
+    return 0;
+  }
+
+  const jobText = [
+    job.description,
+    ...job.keywords,
+    ...job.requiredSkills,
+    job.jobTitle,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  const repoText = [
+    repo.name,
+    repo.description || "",
+    repo.language || "",
+    ...(repo.topics ?? []),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  let score = 0;
+
+  // Score against explicit keywords and required skills
+  const terms = [...job.keywords, ...job.requiredSkills].map((k) =>
+    k.toLowerCase(),
+  );
+
+  for (const term of terms) {
+    if (term && repoText.includes(term)) score += 2;
+  }
+
+  // Word overlap with full job description
+  const jobWords = jobText.split(/\W+/).filter((w) => w.length > 3);
+  const repoWords = new Set(repoText.split(/\W+/).filter((w) => w.length > 3));
+  for (const word of jobWords) {
+    if (repoWords.has(word)) score += 1;
+  }
+
+  return score;
+}
+
 export default function ProfileImport({
   profile,
   setProfile,
   setResume,
+  job,
 }: Props) {
   const [fetchingGithub, setFetchingGithub] = useState(false);
   const [generatingResume, setGeneratingResume] = useState(false);
+  const resumeFileRef = useRef<HTMLInputElement>(null);
+
+  const hasJobDescription = !!(
+    job?.analyzed &&
+    (job.description || job.keywords.length > 0)
+  );
 
   const update = (key: keyof Profile, value: string) => {
     setProfile((prev) => ({ ...prev, [key]: value }));
@@ -131,7 +197,15 @@ export default function ProfileImport({
         return;
       }
 
-      const projects = repos.slice(0, 6).map((repo) => ({
+      // Score and sort repos by relevance to job description
+      const scored = repos
+        .map((repo) => ({ repo, score: scoreRepoRelevance(repo, job) }))
+        .sort((a, b) => b.score - a.score);
+
+      // Take top 2 most relevant repos (or all if fewer than 2)
+      const topRepos = scored.slice(0, 2).map((s) => s.repo);
+
+      const projects = topRepos.map((repo) => ({
         id: Math.random().toString(36).slice(2, 9),
         name: repo.name
           .replace(/-/g, " ")
@@ -177,7 +251,9 @@ export default function ProfileImport({
       }));
 
       toast.success(
-        "ATS-friendly resume generated! Review it in the Resume Editor.",
+        hasJobDescription
+          ? "Added 2 most relevant GitHub projects based on your job description!"
+          : "ATS-friendly resume generated! Review it in the Resume Editor.",
       );
     } catch {
       toast.error("Could not generate resume. Please try again.");
@@ -209,6 +285,13 @@ export default function ProfileImport({
               Generate. We'll pull your repos, skills, and projects
               automatically.
             </p>
+            {hasJobDescription && (
+              <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                <Info size={11} className="text-primary shrink-0" />
+                Job description detected — only the 2 most relevant repos will
+                be added.
+              </p>
+            )}
           </div>
           <Button
             type="button"
@@ -432,15 +515,103 @@ export default function ProfileImport({
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="importedResumeText">Paste Existing Resume</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="importedResumeText">Existing Resume</Label>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    data-ocid="profile.resume.upload_button"
+                    className="h-7 px-2 text-xs gap-1.5"
+                    onClick={() => resumeFileRef.current?.click()}
+                  >
+                    <Upload size={12} />
+                    Upload file
+                  </Button>
+                  <input
+                    ref={resumeFileRef}
+                    type="file"
+                    accept=".txt,.pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (!file.name.endsWith(".txt")) {
+                        toast.info(
+                          "For best results, upload a .txt version of your resume",
+                        );
+                      }
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const text = ev.target?.result as string;
+                        if (text) update("importedResumeText", text);
+                      };
+                      reader.readAsText(file);
+                    }}
+                  />
+                  {profile.importedResumeText.trim().length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      data-ocid="profile.resume.secondary_button"
+                      className="h-7 px-2 text-xs gap-1.5"
+                      onClick={() => {
+                        const blob = new Blob([profile.importedResumeText], {
+                          type: "text/plain",
+                        });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "resume_uploaded.txt";
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      <Download size={12} />
+                      Download
+                    </Button>
+                  )}
+                </div>
+              </div>
               <Textarea
                 id="importedResumeText"
                 data-ocid="profile.resume.textarea"
                 value={profile.importedResumeText}
                 onChange={(e) => update("importedResumeText", e.target.value)}
-                placeholder="Paste your existing resume content here..."
+                placeholder="Paste your existing resume content here, or upload a .txt file..."
                 rows={5}
               />
+              {profile.importedResumeText.trim().length > 0 && (
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <FileText size={14} className="text-primary" />
+                    <span>
+                      Resume loaded (
+                      {
+                        profile.importedResumeText
+                          .trim()
+                          .split(/\s+/)
+                          .filter(Boolean).length
+                      }{" "}
+                      words)
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    data-ocid="profile.resume.analyze_button"
+                    className="h-7 px-2.5 text-xs gap-1.5"
+                    onClick={() =>
+                      toast.info("Go to ATS Score to see your resume match!")
+                    }
+                  >
+                    Analyze vs Job Description
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

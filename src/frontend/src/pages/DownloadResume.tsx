@@ -8,7 +8,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Check, Copy, Download, FileText, Sparkles } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  FileDown,
+  FileText,
+  Sparkles,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import ResumePreview from "../components/ResumePreview";
@@ -59,6 +66,7 @@ function resumeToPlainText(resume: ResumeData, profile: Profile): string {
       .join(" | "),
   );
   if (profile.linkedinUrl) lines.push(profile.linkedinUrl);
+  if (profile.portfolioUrl) lines.push(profile.portfolioUrl);
   lines.push("");
   if (resume.summary || profile.summary) {
     lines.push("PROFESSIONAL SUMMARY");
@@ -116,6 +124,19 @@ export default function DownloadResume({ resume, profile, job }: Props) {
   const [copied, setCopied] = useState(false);
 
   const handlePrint = () => window.print();
+
+  const handleDownloadTxt = () => {
+    const text = resumeToPlainText(resume, profile);
+    const name = (profile.fullName || "resume").replace(/\s+/g, "_");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}_resume.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Resume downloaded as .txt file!");
+  };
 
   const handleCopyText = async () => {
     const text = resumeToPlainText(resume, profile);
@@ -205,6 +226,15 @@ export default function DownloadResume({ resume, profile, job }: Props) {
           className="gap-2"
         >
           <Download size={14} /> Download PDF
+        </Button>
+        <Button
+          type="button"
+          data-ocid="download.txt.secondary_button"
+          onClick={handleDownloadTxt}
+          variant="outline"
+          className="gap-2"
+        >
+          <FileDown size={14} /> Download as TXT
         </Button>
         <Button
           type="button"

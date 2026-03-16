@@ -32,6 +32,7 @@ export default function App() {
             profile={profile}
             setProfile={setProfile}
             setResume={setResume}
+            job={job}
           />
         );
       case "job":
@@ -52,6 +53,7 @@ export default function App() {
             job={job}
             score={score}
             setScore={setScore}
+            setResume={setResume}
           />
         );
       case "download":
